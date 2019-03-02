@@ -3,6 +3,7 @@ const bcrypt= require('bcryptjs')
 module.exports = {
     register: async (req, res) => { 
         const {username, password} = req.body
+        const {session} = req
         const db = req.app.get('db')
         
         let takenUsername = await db.check_username({username})
@@ -17,7 +18,46 @@ module.exports = {
 
         let user = await db.create_user({username, password:hash})
         user = user[0]
-        // session.user= user
-        res.status(200).send(user)
+        session.user= user
+        res.status(200).send(session.user)
+    },
+    login: async (req,res) => {
+        const {username, password} = req.body
+        const db = req.app.get('db')
+        const {session} = req
+
+        console.log(req.body)
+
+        let user = await db.login({username})
+        user = user[0]
+
+        if (!user) {
+            return res.sendStatus(404)
+        }
+
+        let authenticated = bcrypt.compareSync(password, user.password)
+        console.log('auth', authenticated)
+
+        if (authenticated) {
+            delete user.password
+            session.user = user
+            res.status(200).send(session.user)
+        } else {
+            res.sendStatus(401)
+        }
+    },
+    logout: (req, res) => {
+        req.session.destroy()
+        res.sendStatus(200)
+    },
+    getUser: (req,res) => {
+        const {user} = req.session
+        if (user) {
+            res.status(200).send(user)
+        }else {
+            res.sendStatus(401)
+        }
     }
+
+
 }
